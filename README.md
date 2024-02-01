@@ -12,14 +12,7 @@ To install the `conda` environment used to run the scripts just run
 
 ```conda env create -f requirements.yaml```
 
-Download the datasets from 
-
-and copy the files in `data/datasets` folder.
-
-Download the weights from
-
-and copy the files in `weights` folder.
-
+Download the data from [here](https://doi.org/10.5281/zenodo.10606529), extract the `.zip` file and copy the content of `AMCG_DATA` in the `data` folder. 
 
 ## Usage
 

@@ -52,4 +52,4 @@ The notebook `eval.ipynb` contains the code used to generate tables and figures.
 
 ## License
 
-The current software is GPL-licensed. Please see `license.txt` file in the repository.
+AMCG is GPL-licensed. Please see `license.txt` file in the repository.

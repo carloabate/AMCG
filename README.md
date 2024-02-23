@@ -10,7 +10,7 @@
 
 To install the `conda` environment used to run the scripts just run
 
-```conda env create -f requirements.yaml```
+```conda env create -f environment.yaml```
 
 Download the data from [here](https://doi.org/10.5281/zenodo.10606529), extract the `.zip` file and copy the content of `AMCG_DATA` in the `data` folder. 
 

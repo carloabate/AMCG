@@ -17,7 +17,7 @@ def main():
     config_path = sys.argv[1]
     exp_dict, train_dict = read_train_config_file(config_path)
     
-    experiment_type = exp_dict['experiment_type']
+    experiment_type = exp_dict['type']
     dataset_path = exp_dict['dataset_path']
     load_ckpt = exp_dict['load_ckpt']
     ckpt_path = exp_dict['ckpt_path']

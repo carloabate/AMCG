@@ -459,6 +459,7 @@ def get_samples_from_sampler(latent_sampler, model, get_molecules_fn, n_samples,
         list: A list of sampled molecules.
     """
     sampled_mols = []
+    print(f'Sampling {n_samples} molecules')
     while len(sampled_mols) < n_samples:
         sampled_latent = latent_sampler.sample(sample_size)
         nnew_edge_index, aatom_types, bbond_types, hhs_pred = get_net_output(sampled_latent, model, batch_size, perturb_hist, perturb_mode)
@@ -475,4 +476,5 @@ def get_samples_from_sampler(latent_sampler, model, get_molecules_fn, n_samples,
                         sampled_mols.append(m)
                 except:
                     pass
+        print(f'Sampled {len(sampled_mols)} molecules')
     return sampled_mols[:n_samples]

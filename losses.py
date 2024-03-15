@@ -50,6 +50,12 @@ def adj_recon_loss(adj_pred, pos_edge_index, neg_edge_index, pos_dense=None, neg
 
     return pos_loss, neg_loss
    
+class NoPropException(Exception):
+    """
+    Exception raised when there are no predicted properties.
+    """
+    pass
+
 
 def target_prop_loss(prop, target_prop):
     """
@@ -64,7 +70,7 @@ def target_prop_loss(prop, target_prop):
     """
     assert len(prop) == len(target_prop)
     if len(prop) == 0:
-        return torch.tensor(0, dtype=torch.float32)
+        raise NoPropException()
     mse_loss = torch.nn.MSELoss()
     return sum([mse_loss(x, torch.unsqueeze(y, dim=-1)) for x,y in zip(prop, target_prop)])
 

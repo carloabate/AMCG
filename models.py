@@ -127,7 +127,10 @@ class AMCG(nn.Module):
         neg_edge_index=remove_self_loops(data.neg_edge_index)[0]
         edge_attr=data.edge_attr
         batch=data.batch
-        y = [data.y[:, idx] for idx in prop_indices]
+        if isinstance(prop_indices, list) and len(prop_indices) > 0:
+            y = [data.y[:, idx] for idx in prop_indices]
+        else:
+            y = []
         
         (mol_kl_loss, pos_loss, neg_loss, bond_loss, 
          hist_loss, recon_p_loss, recon_n_loss, 

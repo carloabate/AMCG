@@ -7,7 +7,7 @@ from torch_geometric.nn.models import InnerProductDecoder
 from torch_geometric.nn.conv import GATv2Conv
 from torch_geometric.utils import dense_to_sparse, remove_self_loops, unbatch
 from amcg_utils.gen_utils import positional_encoding, flatten, at_from_hist, rearrange, get_perturbed_histogram
-from losses import adj_recon_loss, target_prop_loss
+from losses import adj_recon_loss, target_prop_loss, NoPropException
 
 # GENERIC PIECES
 class HeteroMLP(nn.Module):
@@ -329,7 +329,10 @@ class AtomGenerator(nn.Module):
         rearranged, recon_mu_losses = rearrange(predicted_mus, target_mus, n_workers=self.num_workers)
         recon_mu_loss = torch.sum(torch.stack(recon_mu_losses))
         hist_loss = mse_loss(pred_hist, target_hist)
-        prop_loss = target_prop_loss(props, target_props)
+        try:
+            prop_loss = target_prop_loss(props, target_props)
+        except NoPropException:
+            prop_loss = torch.tensor(0.0, dtype=torch.float32).to(mol_z.device)
 
         if return_atoms:
             return hist_loss, recon_mu_loss, prop_loss, rearranged

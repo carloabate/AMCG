@@ -10,29 +10,53 @@ from amcg_utils.gen_utils import positional_encoding, flatten, at_from_hist, rea
 from losses import adj_recon_loss, target_prop_loss, NoPropException
 
 # GENERIC PIECES
+
 class HeteroMLP(nn.Module):
+    """
+    Heterolinear Multi-Layer Perceptron (MLP) module.
+
+    Args:
+        in_channels (int): Number of input channels.
+        hidden_channels (list): List of hidden layer sizes.
+        num_classes (int): Number of output classes.
+
+    Attributes:
+        layers (nn.ModuleList): List of MLP layers.
+        out_channels (int): Number of output channels.
+
+    """
     def __init__(self, in_channels, hidden_channels, num_classes):
         super().__init__()
         self.layers = nn.ModuleList()
-        self.layers.append(HeteroLinear(in_channels = in_channels,
-                                        out_channels = hidden_channels[0],
-                                        num_types = num_classes))
+        self.layers.append(HeteroLinear(in_channels=in_channels,
+                                        out_channels=hidden_channels[0],
+                                        num_types=num_classes))
         self.out_channels = hidden_channels[-1]
         for i in range(len(hidden_channels)-1):
             self.layers.append(HeteroLinear(in_channels=hidden_channels[i],
                                             out_channels=hidden_channels[i+1],
                                             num_types=num_classes))
+
     def forward(self, x, atom_types):
         for i in range(len(self.layers) - 1):
             x = torch.relu(self.layers[i](x, atom_types))
         return self.layers[-1](x, atom_types)
-    
-    
-class ZA_Embedder(nn.Module): # in_channels = z channels + mol channels
+
+
+class ZA_Embedder(nn.Module):
+    """
+    ZA Embedder module.
+
+    Args:
+        in_channels (int): Number of input channels.
+        hidden_channels (int): Number of hidden channels.
+        out_channels (int): Number of output channels.
+
+    """
     def __init__(self, in_channels, hidden_channels, out_channels):
         super().__init__()
-        self.linear_1 = Linear(in_channels = in_channels, out_channels = hidden_channels)
-        self.linear_2 = Linear(in_channels = hidden_channels, out_channels = out_channels)
+        self.linear_1 = Linear(in_channels=in_channels, out_channels=hidden_channels)
+        self.linear_2 = Linear(in_channels=hidden_channels, out_channels=out_channels)
 
     def forward(self, z, adj):
         z = torch.matmul(adj, z)
@@ -41,8 +65,12 @@ class ZA_Embedder(nn.Module): # in_channels = z channels + mol channels
         z = self.linear_2(z)
         return z
 
-    
+
 class ADJ_Dec(nn.Module):
+    """
+    Adjacency matrix decoder module.
+
+    """
     def __init__(self):
         super().__init__()
         self.decoder = InnerProductDecoder()
@@ -51,7 +79,7 @@ class ADJ_Dec(nn.Module):
         self.dec_bias = torch.nn.Parameter(torch.randn(1))
         self.dec_scaling.requires_grad = True
         self.dec_bias.requires_grad = True
-    
+
     def forward(self, z):
         adj_pred = self.decoder.forward_all(z, sigmoid=False)
         adj_pred = self.dec_scaling * adj_pred + self.dec_bias
@@ -59,6 +87,17 @@ class ADJ_Dec(nn.Module):
 
 
 class Bond_Pred(nn.Module):
+    """
+    Bond predictor module.
+
+    Args:
+        in_channels (int): Number of input channels.
+        embedding_dim (int): Dimension of the bond embedding.
+        za_hc (int): Number of hidden channels for ZA embedder.
+        c_hc (int): Number of hidden channels for MLP classifier.
+        bond_types (int): Number of bond types.
+
+    """
     def __init__(self, in_channels: int, embedding_dim: int, za_hc: int,
                  c_hc: int, bond_types: int) -> None:
         super().__init__()
@@ -76,12 +115,23 @@ class Bond_Pred(nn.Module):
 
 #ENCODER
 
-class AtomEncoder(nn.Module):  #OUTPUT = OUT_CHANNELS * 2
+class AtomEncoder(nn.Module):
+    """
+    Atomic encoder module.
+
+    Args:
+        in_channels (int): Number of input channels.
+        embedding_dim (int): Dimension of the initial atomic embedding.
+        hidden_channels (int): Number of hidden channels of the first GAT layer (without considering heads).
+        out_channels (int): Number of channels of the second GAT layer (without considering heads).
+        num_atom_types (int): Number of atom types.
+
+    """
     def __init__(self, in_channels, embedding_dim, hidden_channels, out_channels, num_atom_types):
         super(AtomEncoder, self).__init__()
         self.atomic_embedder = MLP(in_channels=in_channels, hidden_channels=[embedding_dim])
         self.gcn_shared_1 = GATv2Conv(embedding_dim, hidden_channels, heads=2, concat=True, edge_dim=13)
-        self.shared_act = HeteroLinear(in_channels = hidden_channels*2, out_channels = hidden_channels*2, num_types=num_atom_types)
+        self.shared_act = HeteroLinear(in_channels=hidden_channels*2, out_channels=hidden_channels*2, num_types=num_atom_types)
 
         self.gcn_mu = GATv2Conv(hidden_channels*2, out_channels, heads=2, concat=True, edge_dim=13)
         self.mu_act = HeteroLinear(in_channels=out_channels*2+in_channels, out_channels=out_channels*2, num_types=num_atom_types)
@@ -92,7 +142,7 @@ class AtomEncoder(nn.Module):  #OUTPUT = OUT_CHANNELS * 2
         self.logvar_act_2 = HeteroLinear(in_channels=out_channels*2, out_channels=out_channels*2, num_types=num_atom_types)
 
         self.in_channels = in_channels
-        self.out_channels = out_channels*2
+        self.out_channels = out_channels*2 # 2 heads
 
     def forward(self, x, edge_index, edge_attr, atom_types):
         y = self.atomic_embedder(x)
@@ -113,6 +163,15 @@ class AtomEncoder(nn.Module):  #OUTPUT = OUT_CHANNELS * 2
 
 
 class MolEncoder(nn.Module): 
+    """
+    Molecular Encoder module.
+
+    Args:
+        in_channels (int): Number of input channels.
+        hidden_channels (int): Number of hidden channels.
+        out_channels (int): Number of output channels.
+
+    """
     def __init__(self, in_channels, hidden_channels, out_channels) -> None:
         super().__init__()
         self.aggregator = SumAggregation()
@@ -134,6 +193,15 @@ class MolEncoder(nn.Module):
 
 
 class GlobalEncoder(nn.Module):
+    """
+    Global Encoder module.
+
+    Args:
+        atom_encoder (AtomEncoder): Atom Encoder module.
+        mol_encoder (MolEncoder): Molecular Encoder module.
+        max_logstd (float, optional): Maximum value for log standard deviation. Defaults to None.
+
+    """
     def __init__(self, atom_encoder: AtomEncoder, mol_encoder: MolEncoder, max_logstd=None) -> None:
         super().__init__()
         self.atom_encoder = atom_encoder
@@ -158,6 +226,16 @@ class GlobalEncoder(nn.Module):
 
 # COMBINER
 class Combiner(nn.Module):
+    """
+    Combiner module.
+
+    Args:
+        in_channels (int): Number of input channels.
+        hidden_channels (int): Number of hidden channels.
+        out_channels (int): Number of output channels.
+        num_atom_types (int): Number of atom types.
+
+    """
     def __init__(self, in_channels, hidden_channels, out_channels, num_atom_types) -> None:
         super().__init__()
         self.z_MLP = HeteroMLP(in_channels=in_channels,
@@ -167,6 +245,7 @@ class Combiner(nn.Module):
                                                 out_channels],
                                num_classes=num_atom_types)
         self.out_channels = out_channels
+
     def forward(self, atom_z, mol_z, atom_types, batch):
         out = torch.cat([atom_z, mol_z[batch]], dim=-1)
         out = self.z_MLP(out, atom_types)
@@ -175,15 +254,39 @@ class Combiner(nn.Module):
 
 # SHARED DECODER
 class Decoder(nn.Module):
+    """
+    Decoder module.
+
+    Args:
+        adj_decoder (ADJ_Dec): Adjacency Decoder module.
+        bond_classifier (Bond_Pred): Bond Predictor module.
+        hs_predictor (HeteroMLP): Heterogeneous MLP module.
+
+    """
     def __init__(self, adj_decoder: ADJ_Dec, bond_classifier: Bond_Pred, hs_predictor: HeteroMLP) -> None:
         super().__init__()
         self.adj_dec = adj_decoder
         self.bond_class = bond_classifier
         self.hs_pred = hs_predictor
 
-    def forward(self, x, atom_types, true_edge_mask, edge_index=None):  # edge_index is where to evaluate bonds, 
-                                                                        # if not provided evaluate everywhere the
-                                                                        # model predicts the presence of a bond
+    def forward(self, x, atom_types, true_edge_mask, edge_index=None):
+        """
+        Forward pass of the model.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+            atom_types (torch.Tensor): Tensor representing atom types.
+            true_edge_mask (torch.Tensor): Tensor representing the true edges (due to how pyg works).
+            edge_index (torch.Tensor, optional): Tensor representing the edge index where to evaluate bonds. 
+                If not provided, evaluate everywhere the model predicts the presence of a bond.
+
+        Returns:
+            Tuple[torch.Tensor]: A tuple containing the following tensors:
+                - true_adj_pred (torch.Tensor): Tensor representing the predicted adjacency matrix.
+                - bond_pred (torch.Tensor): Tensor representing the predicted bond class.
+                - hs_pred (torch.Tensor): Tensor representing the predicted hydrogens.
+                - new_edge_index (torch.Tensor): Tensor representing the new edge index tensor.
+        """
         hs_pred = torch.relu(self.hs_pred(x, atom_types))
         adj_pred = self.adj_dec(x)
         true_adj_pred = torch.multiply(true_edge_mask, adj_pred)
@@ -207,7 +310,6 @@ class Decoder(nn.Module):
     def loss(self, x, atom_types, pos_edge_index, neg_edge_index,
              true_edge_mask, target_bond_types, target_hydrogens,
              pos_dense=None, neg_dense=None):
-
         mse_loss = torch.nn.MSELoss()
         cel_loss = torch.nn.CrossEntropyLoss()
 
@@ -226,8 +328,51 @@ class Decoder(nn.Module):
 
 
 class AtomGenerator(nn.Module):
+    """
+    The initial part of the right branch of the model, responsible for generating atoms.
+
+    Args:
+        in_channels (int): Number of input channels.
+        num_atom_types (int): Number of atom types.
+        generator_latent_dims (int): Dimensionality of the generator latent vectors.
+        atom_latent_dims (int): Dimensionality of the atom latent vectors.
+        num_properties (int): Number of properties.
+        max_logstd (float, optional): Maximum value for the log standard deviation. Defaults to None.
+        num_workers (int, optional): Number of workers. Defaults to None.
+
+    Attributes:
+        hist_pred (MLP): MLP module for predicting the histogram of atom types.
+        prop_preds (ModuleList): List of MLP modules for predicting properties.
+        mu_preds (ModuleList): List of MLP modules for predicting mean values of atom-type specific gaussian priors.
+        sigma_preds (ModuleList): List of MLP modules for predicting standard deviations of atom-type specific gaussian priors.
+        sumaggregator (SumAggregation): SumAggregation module for aggregating atom latent vectors.
+        final_mlp (HeteroMLP): HeteroMLP module for final surrogate atomic representations.
+        num_atom_types (int): Number of atom types.
+        num_properties (int): Number of properties.
+        num_workers (int): Number of workers.
+
+    Methods:
+        forward(mol_z, hist=None, perturb_hist=False, perturb_mode=None, return_pred_hist=False):
+            Forward pass of the AtomGenerator module.
+        loss(mol_z, target_hist, target_atoms, target_props, return_atoms=False):
+            Compute the loss of the AtomGenerator module.
+
+    """
+
     def __init__(self, in_channels, num_atom_types, generator_latent_dims,
                  atom_latent_dims, num_properties, max_logstd=None, num_workers=None) -> None:
+        """
+        Initializes the AtomGenerator module.
+
+        Args:
+            in_channels (int): Number of input channels.
+            num_atom_types (int): Number of atom types.
+            generator_latent_dims (int): Dimensionality of the generator latent vectors.
+            atom_latent_dims (int): Dimensionality of the atom latent vectors.
+            num_properties (int): Number of properties.
+            max_logstd (float, optional): Maximum value for the log standard deviation. Defaults to None.
+            num_workers (int, optional): Number of workers. Defaults to None.
+        """
         super().__init__()
         self.hist_pred = MLP(in_channels=in_channels, hidden_channels=[1024,num_atom_types])
         self.prop_preds = nn.ModuleList()

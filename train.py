@@ -10,6 +10,18 @@ from losses import loss_fn
 from amcg_utils.gen_utils import write_to_log, read_train_config_file
 
 def main():
+    """
+    Main function for training the AMCG model.
+
+    This function reads the configuration file, loads the dataset, instantiates the model,
+    performs the training loop, and saves the model checkpoints.
+
+    Args:
+        None
+
+    Returns:
+        None
+    """
     DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # READ CONFIG

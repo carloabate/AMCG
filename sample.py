@@ -6,7 +6,30 @@ from amcg_utils.sampling_utils import get_molecules_gen_fn, get_latent_sampler, 
 from amcg_utils.gen_utils import read_sample_config_file, write_lines_to_file, read_lines_list
 from amcg_utils.eval_utils import get_vun, get_validity
 
+
 def main():
+    """
+    Main function that performs the sampling and VUN evaluation of the sampled molecules.
+    After that, it saves the samples to a file.
+    
+    It performs the following steps:
+    1. Reads the configuration file.
+    2. Loads the data.
+    3. Instantiates the model based on the experiment type.
+    4. Loads the model weights.
+    5. Gets the molecular embeddings.
+    6. Fits the latent sampler.
+    7. Gets the molecules generation function.
+    8. Performs the sampling loop.
+    9. Evaluates the samples if required.
+    10. Saves the samples.
+
+    Args:
+        None
+
+    Returns:
+        None
+    """
     DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # READ CONFIG

@@ -9,6 +9,18 @@ from pieces import GlobalEncoder, Decoder, AtomGenerator, Combiner, AtomEncoder,
 
 # MODEL
 class AMCG(nn.Module):
+    """
+    AMCG model.
+
+    Args:
+        encoder (GlobalEncoder): The global encoder module.
+        decoder (Decoder): The shared decoder module.
+        generator (AtomGenerator): The molecular decoder - atomic generator module.
+        combiner (Combiner): The combiner module.
+        num_atom_types (int): The number of atom types.
+        num_bond_types (int): The number of bond types.
+        max_logstd (float, optional): The maximum value for the log standard deviation. Defaults to None.
+    """
     def __init__(self, encoder: GlobalEncoder, decoder: Decoder, 
                  generator: AtomGenerator, combiner: Combiner, num_atom_types,
                  num_bond_types, max_logstd=None) -> None:
@@ -31,8 +43,17 @@ class AMCG(nn.Module):
         self.atom_channels = self.encoder.atom_encoder.out_channels
         self.mol_channels = self.encoder.mol_encoder.out_channels
 
-    def encode_batch(self, data_batch, return_all=False): # data_batch is a Batch object
+    def encode_batch(self, data_batch, return_all=False):
+        """
+        Encodes a batch of data.
 
+        Args:
+            data_batch (Batch): The input data batch.
+            return_all (bool, optional): Whether to return mus and sigmas. Defaults to False.
+
+        Returns:
+            tuple: Atomic encodings and molecular encodings.
+        """
         x = torch.cat((data_batch.x, data_batch.random_walk_pe), dim=-1)
         edge_index = data_batch.edge_index
         edge_attr = data_batch.edge_attr
@@ -49,7 +70,22 @@ class AMCG(nn.Module):
 
     def loss(self, x, pos_edge_index, neg_edge_index, edge_attr, batch,
              y, atom_types=None, num_atoms=None):
-    
+        """
+        Computes the loss for the model.
+
+        Args:
+            x: The input features.
+            pos_edge_index: The positive edge indices.
+            neg_edge_index: The negative edge indices.
+            edge_attr: The edge attributes.
+            batch: The batch indices.
+            y: The target properties.
+            atom_types: The atom types. Defaults to None.
+            num_atoms: The number of atoms. Defaults to None.
+
+        Returns:
+            tuple: The computed losses.
+        """
         if atom_types is None:
             atom_types = torch.argmax(x[:,:self.num_atom_types], dim=-1)    
 
@@ -95,7 +131,20 @@ class AMCG(nn.Module):
         return mol_kl_loss, pos_loss, neg_loss, bond_loss, hist_loss, recon_p_loss, recon_n_loss, recon_b_loss, recon_m_loss, prop_loss, hs_loss, recon_hs_loss
     
 
-    def infer_from_z(self, mol_z, return_props=False, perturb_hist=False, perturb_mode=None): # mol_z is a tensor of shape (batch_size, mol_latent_dims)
+    def infer_from_z(self, mol_z, return_props=False, perturb_hist=False, perturb_mode=None):
+        """
+        Inference step from the given latent embeddings via right branch.
+
+        Args:
+            mol_z: The molecular latent embeddings of shape (batch_size, mol_latent_dims).
+            return_props (bool, optional): Whether to return the predicted properties. Defaults to False.
+            perturb_hist (bool, optional): Whether to perturb the histogram. Defaults to False.
+            perturb_mode (str, optional): The perturbation mode. Defaults to None.
+
+        Returns:
+            tuple: The inferred adjacency matrix, atom types and bond types, batch indices, predicted hydrogens
+            and molecular properties (if required). 
+        """
         _, out, props, atom_types, batch = self.generator(mol_z, perturb_hist=perturb_hist, perturb_mode=perturb_mode)
 
         num_atoms = torch.unique(batch, return_counts=True)[1]    
@@ -109,7 +158,18 @@ class AMCG(nn.Module):
         return new_edge_index, atom_types, bond_pred, batch, hs_pred
 
 
-    def infer_right(self, data_list, return_latent=False, return_props=False): # data_list is a list of Data objects
+    def infer_right(self, data_list, return_latent=False, return_props=False):
+        """
+        Inference step from data input to output, via right branch.
+
+        Args:
+            data_list: The list of Data objects.
+            return_latent (bool, optional): Whether to return the latent embeddings. Defaults to False.
+            return_props (bool, optional): Whether to return the predicted properties. Defaults to False.
+
+        Returns:
+            tuple: The inferred molecular tensors.
+        """
         data = Batch.from_data_list(data_list)
         _, mol_z = self.encode_batch(data_batch=data, return_all=False)
         infer_out = self.infer_from_z(mol_z, return_props=return_props)
@@ -118,7 +178,19 @@ class AMCG(nn.Module):
         return infer_out
     
 
-    def forward(self, data_list, device, prop_indices=None): # data_list is a list of Data objects
+    def forward(self, data_list, device, prop_indices=None):
+        """
+        It computes the losses for the model. It is in the forward method to be used
+        with the DataParallel module.
+
+        Args:
+            data_list: The list of data objects.
+            device: The device to run the model on.
+            prop_indices: The indices of the properties to predict. Defaults to None.
+
+        Returns:
+            tuple: The computed losses.
+        """
         if prop_indices is None:
             prop_indices = [0]
         data = Batch.from_data_list(data_list).to(device)
@@ -148,6 +220,15 @@ class AMCG(nn.Module):
 
 
 def get_amcg_qm9(num_properties=1):
+    """
+    Returns an instance of the AMCG model for QM9 dataset.
+
+    Args:
+        num_properties (int, optional): The number of properties to predict. Defaults to 1.
+
+    Returns:
+        AMCG: The AMCG model instance.
+    """
     num_atom_types = 4
     num_bond_types = 4
     num_in_channels = 54+num_atom_types
@@ -199,6 +280,16 @@ def get_amcg_qm9(num_properties=1):
 
 
 def get_amcg_zinc(num_properties=1):
+    """
+    Returns an instance of the AMCG model for the ZINC dataset.
+
+    Parameters:
+    - num_properties (int): The number of properties to predict.
+
+    Returns:
+    - model (AMCG): An instance of the AMCG model.
+
+    """
     num_atom_types = 9
     num_bond_types = 4
     num_in_channels = 54+num_atom_types

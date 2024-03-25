@@ -9,6 +9,19 @@ from models import get_amcg_qm9, get_amcg_zinc
 
 
 def main():
+    """
+    Main function for running the optimization process.
+
+    This function reads the configuration file, instantiates the model, loads the model weights,
+    loads the data, performs optimization loop, evaluates the optimization if required,
+    and saves the results.
+
+    Args:
+        None
+
+    Returns:
+        None
+    """
     DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # READ CONFIG

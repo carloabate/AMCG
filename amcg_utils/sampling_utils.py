@@ -31,6 +31,7 @@ from rdkit import Chem
 
 from amcg_utils.gen_utils import unbatch_output
 from amcg_utils.build_mol_utils import build_mol, last_try, fix_rings, filter_macrocycles
+from amcg_utils.eval_utils import get_validity
 
 
 class LatentSampler(ABC):
@@ -468,13 +469,12 @@ def get_samples_from_sampler(latent_sampler, model, get_molecules_fn, n_samples,
         sampled_mols_batch = Parallel(n_jobs=n_workers)(delayed(get_molecules_fn)(*args) for args in itertools.zip_longest(nnew_edge_index, aatom_types, bbond_types, hhs_pred))
         if keep_invalid:
             sampled_mols = sampled_mols + sampled_mols_batch
+            n_sampled = len(sampled_mols_batch)
         else:
-            for m in sampled_mols_batch:
-                try:
-                    Chem.SanitizeMol(m)
-                    if m is not None:
-                        sampled_mols.append(m)
-                except:
-                    pass
-        print(f'Sampled {len(sampled_mols)} molecules')
+            _, valid_mols, _, _ =  get_validity(sampled_mols_batch)
+            sampled_mols = sampled_mols + valid_mols
+            n_sampled = len(valid_mols)
+        print(f'Sampled {n_sampled} molecules')
+        print(f'Total sampled: {min(len(sampled_mols), n_samples)}')
+
     return sampled_mols[:n_samples]

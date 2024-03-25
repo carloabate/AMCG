@@ -29,18 +29,18 @@ def main():
     Da_Model = Da_Model.to(DEVICE)
 
     # LOAD DATA
-    ds = torch.load(exp_dict['test_dataset_path'])
+    dataset = torch.load(exp_dict['test_dataset_path'])
     if exp_dict['evaluate_optimization']:
         if exp_dict['smiles_dataset_path'] is not None:
             orig_smiles = read_lines_list(exp_dict['smiles_dataset_path'])
         else:
             raise ValueError('Please provide a smiles dataset path to evaluate optimization')
+    
     # GET SMILES
-    dataset = ds
     test_smiles = [get_clean_smiles(x.info['canonical_smiles'], remove_hs=True) for x in dataset]
 
     # GET LATENTS
-    mol_zs = get_mol_zs(ds, Da_Model, opt_dict['dec_batch_size'], device=DEVICE)
+    mol_zs = get_mol_zs(dataset, Da_Model, opt_dict['dec_batch_size'], device=DEVICE)
 
     # GET MOLECULES GENERATION FUNCTION
     mol_gen_fn = get_molecules_gen_fn(fix_rings_flag=opt_dict['fix_rings'],
@@ -72,7 +72,7 @@ def main():
             dataset_smiles=orig_smiles,
             prop_index=exp_dict['prop_index']
          )
-        print('Validity: ' + str(len(merged_smiles)/len(ds)))
+        print('Validity: ' + str(len(merged_smiles)/len(dataset)))
         print('Optimized rate: ' + str(opt_rate))
         print('Success rate: ' + str(success_rate))
 

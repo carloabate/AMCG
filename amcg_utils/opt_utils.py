@@ -14,6 +14,7 @@ Functions:
 
 import numpy as np
 import torch
+from tqdm import tqdm
 from rdkit import Chem
 
 from amcg_utils.eval_utils import get_validity
@@ -205,23 +206,24 @@ def gradient_ascent_routine(samples, predictor, model, ga_bs, dec_bs, learning_r
     step = 0
     eval_step_summary = []
     smiles_dizzs = []
-    while t_samples.nelement() != 0 and step < n_steps:
-        step_diz = {}
-        ascended = one_step_of_gradient_ascent(t_samples, predictor, ga_bs, learning_rate, descend=descend)
-        
-        if step % evaluation_step_size == evaluation_step_size-1:
-            to_evaluate = ascended.detach().clone()
-            val_dizzs = []
-            for _ in range(n_rejections):
-                to_evaluate, val_dizz = validity_step(to_evaluate, model, dec_bs, get_molecules_fn=get_molecules_fn)
-                val_dizzs.append(val_dizz)
-            validity, valid_ids, valid_smiles = evaluate_val_dizzs(val_dizzs, ascended.shape[0])
-            step_diz['validity'] = validity
-            step_diz['valid_ids'] = valid_ids
-            step_diz['valid_smiles'] = valid_smiles
-            smiles_dizzs.append(dict(zip(step_diz['valid_ids'], step_diz['valid_smiles'])))
-            eval_step_summary.append(step_diz)
+    for step in tqdm(range(n_steps)):
+        if t_samples.nelement() == 0:
+            break
+        else:
+            step_diz = {}
+            ascended = one_step_of_gradient_ascent(t_samples, predictor, ga_bs, learning_rate, descend=descend)            
+            if step % evaluation_step_size == evaluation_step_size-1:
+                to_evaluate = ascended.detach().clone()
+                val_dizzs = []
+                for _ in range(n_rejections):
+                    to_evaluate, val_dizz = validity_step(to_evaluate, model, dec_bs, get_molecules_fn=get_molecules_fn)
+                    val_dizzs.append(val_dizz)
+                validity, valid_ids, valid_smiles = evaluate_val_dizzs(val_dizzs, ascended.shape[0])
+                step_diz['validity'] = validity
+                step_diz['valid_ids'] = valid_ids
+                step_diz['valid_smiles'] = valid_smiles
+                smiles_dizzs.append(dict(zip(step_diz['valid_ids'], step_diz['valid_smiles'])))
+                eval_step_summary.append(step_diz)
 
-        t_samples = ascended
-        step = step + 1
+            t_samples = ascended
     return eval_step_summary, smiles_dizzs

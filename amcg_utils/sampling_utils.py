@@ -177,12 +177,13 @@ class GMM_F_Sampler(LatentSampler):
 
     """
 
-    def __init__(self, mol_zs, n_components=10):
+    def __init__(self, mol_zs, n_components=10, multiplier=1):
         super().__init__(mol_zs)
         self.dim = mol_zs.shape[1]
         mol_zs_np = mol_zs.cpu().numpy()
         self.gmm = GaussianMixture(n_components=n_components, covariance_type='full')
         self.gmm.fit(mol_zs_np)
+        self.gmm.covariances_ *= multiplier
     
     def sample(self, N):
         """
@@ -213,15 +214,19 @@ class GMM_PW_Sampler(LatentSampler):
 
     """
 
-    def __init__(self, mol_zs):
-        super().__init__(mol_zs)
-        self.dim = mol_zs.shape[1]
-    
+    def __init__(self, mol_mus, mol_logstd, multiplier=1):
+        super().__init__(mol_mus)
+        self.len = mol_mus.shape[0]
+        self.mol_mus = mol_mus
+        self.mol_logstd = mol_logstd
+        self.multiplier = multiplier
     def sample(self, N):
-        return random.sample(self.mol_zs, N)
+        indices = random.sample(range(self.len), N)
+        mol_zs = self.mol_mus[indices] + torch.randn(N, self.mol_mus.shape[1]).to(self.device) * torch.exp(self.mol_logstd[indices]) * self.multiplier
+        return mol_zs
 
 
-def get_latent_sampler(prior_type, mol_zs, n_components=10, multiplier=1):
+def get_latent_sampler(prior_type, mol_zs, n_components=10, multiplier=1, mol_logstd=None):
     """
     Returns a latent sampler based on the specified prior type.
 
@@ -244,9 +249,9 @@ def get_latent_sampler(prior_type, mol_zs, n_components=10, multiplier=1):
     elif prior_type == 'GMM_D':
         return GMM_D_Sampler(mol_zs, n_components=n_components, multiplier=multiplier)
     elif prior_type == 'GMM_F':
-        return GMM_F_Sampler(mol_zs, n_components=n_components)
+        return GMM_F_Sampler(mol_zs, n_components=n_components, multiplier=multiplier)
     elif prior_type == 'GMM_PW':
-        return GMM_PW_Sampler(mol_zs)
+        return GMM_PW_Sampler(mol_zs, mol_logstd=mol_logstd, multiplier=multiplier)
     else:
         raise ValueError('Invalid type of latent sampler')
 
@@ -266,13 +271,21 @@ def get_mol_zs(dataset, model, batch_size, device):
     """
     dl = DataListLoader(dataset, batch_size=batch_size)
     mol_zs = []
+    mol_mus = []
+    mol_logstds = []
     with torch.inference_mode():
         model.eval()
         for item in dl:
             data_batch = Batch.from_data_list(item).to(device)
-            _, mol_z = model.encode_batch(data_batch)
+            out = model.encode_batch(data_batch, return_all=True)
+            mol_mu = out[2]
+            mol_logstd = out[3]
+            mol_z = mol_mu + torch.randn_like(mol_mu) * torch.exp(mol_logstd)
             mol_zs.append(mol_z)
-    return torch.cat(mol_zs, dim=0)
+            mol_mus.append(mol_mu)
+            mol_logstds.append(mol_logstd)
+
+    return torch.cat(mol_zs, dim=0), torch.cat(mol_mus, dim=0), torch.cat(mol_logstds, dim=0)
 
 
 def get_net_output(sampled_latent: torch.Tensor, model,
@@ -346,8 +359,10 @@ def get_molecules_gen_fn(fix_rings_flag=False, filter_macrocycles_flag=False, us
                                   bond_types=bond_types,
                                   hs=hs_pred,
                                   is_atom_types=True)
-                    m = fix_rings(m)
-                    m = filter_macrocycles(m)
+                    if m is not None:
+                        m = fix_rings(m)
+                        if m is not None:
+                            m = filter_macrocycles(m)
                     return m
             else:
                 def get_molecules(new_edge_index, atom_types, bond_types, hs_pred):
@@ -357,7 +372,8 @@ def get_molecules_gen_fn(fix_rings_flag=False, filter_macrocycles_flag=False, us
                                   bond_types=bond_types,
                                   hs=hs_pred,
                                   is_atom_types=True)
-                    m = fix_rings(m)
+                    if m is not None:
+                        m = fix_rings(m)
                     return m
         else:
             if filter_macrocycles_flag:
@@ -368,7 +384,8 @@ def get_molecules_gen_fn(fix_rings_flag=False, filter_macrocycles_flag=False, us
                                   bond_types=bond_types,
                                   hs=hs_pred,
                                   is_atom_types=True)
-                    m = filter_macrocycles(m)
+                    if m is not None:
+                        m = filter_macrocycles(m)
                     return m
             else:
                 def get_molecules(new_edge_index, atom_types, bond_types, hs_pred):
@@ -388,8 +405,10 @@ def get_molecules_gen_fn(fix_rings_flag=False, filter_macrocycles_flag=False, us
                                  atom_numbers_or_types=atom_types,
                                  bond_types=bond_types,
                                  is_atom_types=True)
-                    m = fix_rings(m)
-                    m = filter_macrocycles(m)
+                    if m is not None:
+                        m = fix_rings(m)
+                        if m is not None:
+                            m = filter_macrocycles(m)
                     return m
             else:
                 def get_molecules(new_edge_index, atom_types, bond_types, hs_pred=None):
@@ -398,7 +417,8 @@ def get_molecules_gen_fn(fix_rings_flag=False, filter_macrocycles_flag=False, us
                                  atom_numbers_or_types=atom_types,
                                  bond_types=bond_types,
                                  is_atom_types=True)
-                    m = fix_rings(m)
+                    if m is not None:
+                        m = fix_rings(m)
                     return m
         else:
             if filter_macrocycles_flag:
@@ -408,7 +428,8 @@ def get_molecules_gen_fn(fix_rings_flag=False, filter_macrocycles_flag=False, us
                                  atom_numbers_or_types=atom_types,
                                  bond_types=bond_types,
                                  is_atom_types=True)
-                    m = filter_macrocycles(m)
+                    if m is not None:
+                        m = filter_macrocycles(m)
                     return m
             else:
                 def get_molecules(new_edge_index, atom_types, bond_types, hs_pred=None):

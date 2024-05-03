@@ -53,7 +53,7 @@ def main():
     test_smiles = [get_clean_smiles(x.info['canonical_smiles'], remove_hs=True) for x in dataset]
 
     # GET LATENTS
-    mol_zs = get_mol_zs(dataset, Da_Model, opt_dict['dec_batch_size'], device=DEVICE)
+    mol_zs, _, _ = get_mol_zs(dataset, Da_Model, opt_dict['dec_batch_size'], device=DEVICE)
 
     # GET MOLECULES GENERATION FUNCTION
     mol_gen_fn = get_molecules_gen_fn(fix_rings_flag=opt_dict['fix_rings'],

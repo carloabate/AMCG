@@ -111,6 +111,31 @@ class Bond_Pred(nn.Module):
         return bond_pred
     
 
+class Bond_Pred_Zinc(nn.Module):
+    """
+    Bond predictor module.
+
+    Args:
+        in_channels (int): Number of input channels.
+        embedding_dim (int): Dimension of the bond embedding.
+        za_hc (int): Number of hidden channels for ZA embedder.
+        c_hc (int): Number of hidden channels for MLP classifier.
+        bond_types (int): Number of bond types.
+
+    """
+    def __init__(self, in_channels: int, embedding_dim: int, za_hc: int,
+                 c_hc: int, bond_types: int) -> None:
+        super().__init__()
+        self.embedder = ZA_Embedder(in_channels=in_channels, hidden_channels=za_hc, out_channels=embedding_dim)
+        self.classifier = MLP(in_channels=embedding_dim*2, hidden_channels=[c_hc,bond_types])
+
+    def forward(self, x, adj, src, dst):
+        bond_emb = self.embedder(x, adj)
+        bond_pred = torch.cat((bond_emb[src], bond_emb[dst]), dim=-1)
+        bond_pred = self.classifier(bond_pred)
+        return bond_pred
+
+
 #SUBNETWORKS
 
 #ENCODER

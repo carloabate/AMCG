@@ -5,7 +5,7 @@ from torch_geometric.data import Batch
 from torch_geometric.utils import remove_self_loops
 from amcg_utils.gen_utils import get_true_mask
 from losses import kl_loss
-from pieces import GlobalEncoder, Decoder, AtomGenerator, Combiner, AtomEncoder, MolEncoder, ADJ_Dec, Bond_Pred, HeteroMLP
+from pieces import GlobalEncoder, Decoder, AtomGenerator, Combiner, AtomEncoder, MolEncoder, ADJ_Dec, Bond_Pred, HeteroMLP, Bond_Pred_Zinc
 
 # MODEL
 class AMCG(nn.Module):
@@ -327,7 +327,7 @@ def get_amcg_zinc(num_properties=1):
     # build decoder
 
     adj_dec = ADJ_Dec()
-    bond_predictor = Bond_Pred(in_channels=combiner.out_channels, embedding_dim=2048,
+    bond_predictor = Bond_Pred_Zinc(in_channels=combiner.out_channels, embedding_dim=2048,
                                za_hc=2048, c_hc=2048, bond_types=num_bond_types)
     hs_predictor = HeteroMLP(in_channels=combiner.out_channels, 
                              hidden_channels=[1024,512,1], num_classes=num_atom_types)

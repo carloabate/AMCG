@@ -283,7 +283,7 @@ def first_try(num_atoms, edge_index, atom_numbers, bond_types, hs):
         atom = Chem.Atom(atom_numbers[k])
         atom.SetNumExplicitHs(hs[k])
         mol.AddAtom(atom)
-
+    atoms = list(range(num_atoms))
     if edge_index is not None:
         edges = [tuple(i) for i in edge_index.t().tolist()]
         visited = set()
@@ -291,6 +291,8 @@ def first_try(num_atoms, edge_index, atom_numbers, bond_types, hs):
         for i in range(len(edges)):
             src, dst = edges[i]
             if tuple(sorted(edges[i])) in visited:
+                continue
+            if src not in atoms or dst not in atoms:
                 continue
             if bond_types[i] == 3: #AROMATIC
                 aromatic.add(src)
@@ -325,12 +327,15 @@ def second_try(num_atoms, edge_index, atom_numbers, bond_types, hs, aromatic):
         if k in aromatic:
             atom.SetNumExplicitHs(hs[k])
         newmol.AddAtom(atom)
+    atoms = list(range(num_atoms))
     if edge_index is not None:
         edges = [tuple(i) for i in edge_index.t().tolist()]
         visited = set()
         for i in range(len(edges)):
             src, dst = edges[i]
             if tuple(sorted(edges[i])) in visited:
+                continue
+            if src not in atoms or dst not in atoms:
                 continue
             bond_type = get_bond_type(bond_types[i])
             newmol.AddBond(src, dst, bond_type)
@@ -363,6 +368,7 @@ def last_try(num_atoms, edge_index, atom_numbers_or_types, bond_types, is_atom_t
     for k in range(num_atoms):
         atom = Chem.Atom(atom_numbers[k])
         mol.AddAtom(atom)
+    atoms = list(range(num_atoms))
     if edge_index is not None:
         edges = [tuple(i) for i in edge_index.t().tolist()]
         visited = set()
@@ -371,12 +377,16 @@ def last_try(num_atoms, edge_index, atom_numbers_or_types, bond_types, is_atom_t
             src, dst = edges[i]
             if tuple(sorted(edges[i])) in visited:
                 continue
-            
+            if src not in atoms or dst not in atoms:
+                continue
             bond_type = get_bond_type(bond_types[i])
             mol.AddBond(src, dst, bond_type)
             visited.add(tuple(sorted(edges[i])))
         
     mol = mol.GetMol()
+    g = mol_to_nx(mol)
+    if g is None:
+        return None
     return mol
 
 

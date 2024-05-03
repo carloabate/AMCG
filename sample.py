@@ -5,7 +5,9 @@ from models import get_amcg_qm9, get_amcg_zinc
 from amcg_utils.sampling_utils import get_molecules_gen_fn, get_latent_sampler, get_mol_zs, get_samples_from_sampler
 from amcg_utils.gen_utils import read_sample_config_file, write_lines_to_file, read_lines_list
 from amcg_utils.eval_utils import get_vun, get_validity
+from rdkit import RDLogger
 
+RDLogger.DisableLog('rdApp.*')
 
 def main():
     """
@@ -61,11 +63,15 @@ def main():
 
     Da_Model = Da_Model.to(DEVICE)
 
-    # GET MOL_ZS
-    mol_zs = get_mol_zs(ds, Da_Model, sample_dict['batch_size'], device=DEVICE)
+    
+    if prior_dict['type'] == 'GMM_PW':
+        _, mol_mus, mol_logstd = get_mol_zs(ds, Da_Model, sample_dict['batch_size'], device=DEVICE)
+        latent_sampler = get_latent_sampler(prior_dict['type'], mol_mus, n_components=prior_dict['n_components'],
+                                        multiplier=prior_dict['multiplier'], mol_logstd=mol_logstd)
 
-    # GET LATENT SAMPLER
-    latent_sampler = get_latent_sampler(prior_dict['type'], mol_zs, n_components=prior_dict['n_components'],
+    else:
+        mol_zs, _, _ = get_mol_zs(ds, Da_Model, sample_dict['batch_size'], device=DEVICE)
+        latent_sampler = get_latent_sampler(prior_dict['type'], mol_zs, n_components=prior_dict['n_components'],
                                         multiplier=prior_dict['multiplier'])
 
     # GET MOLECULES GENERATION FUNCTION

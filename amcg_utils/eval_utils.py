@@ -114,6 +114,8 @@ def get_vun(sampled_mols, dataset_smiles):
 
     """
     validity, _, _, valid_smiles = get_validity(sampled_mols)
+    if len(valid_smiles) == 0:
+        return {'Validity': 0, 'Uniqueness': 0, 'Novelty': 0, 'VUN': 0}
     novelty, _ = get_novelty(dataset_smiles + [""], valid_smiles)
     uniqueness, _ = get_uniqueness(valid_smiles)
     vun = validity * novelty * uniqueness

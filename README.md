@@ -1,5 +1,10 @@
 # AMCG: a graph dual atomic-molecular conditional molecular generator
 
+This code reproduces the experimental results obtained with the AMCG model as presented in the paper
+
+[AMCG: a graph dual atomic-molecular conditional molecular generator](https://iopscience.iop.org/article/10.1088/2632-2153/ad5bbf)\
+C. Abate, S. Decherchi, A. Cavalli  
+
 
 ## Table of Contents
 
